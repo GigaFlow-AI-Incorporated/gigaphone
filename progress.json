@@ -1,17 +1,25 @@
 {
   "project": "gigaphone",
   "design_version": "0.4",
+  "package_version": "0.5.0",
   "updated": "2026-06-25",
-  "current_milestone": "M0 — Scaffold",
+  "current_milestone": "v1 working end-to-end",
   "milestones": {
-    "M0": { "title": "Scaffold", "status": "in_progress" },
-    "M1": { "title": "Neutral core spine", "status": "todo" },
-    "M2": { "title": "Python language pack", "status": "todo" },
-    "M3": { "title": "Generic OTel backend adapter", "status": "todo" },
-    "M4": { "title": "Discovery + resolution protocols", "status": "todo" },
-    "M5": { "title": "Harness adapters (Claude Code + Codex)", "status": "todo" },
-    "M6": { "title": "TypeScript pack + native backends + CI mode", "status": "todo" }
+    "M0": { "title": "Scaffold", "status": "done" },
+    "M1": { "title": "Neutral core spine (model, classifier, plan records, config)", "status": "done" },
+    "M2": { "title": "Python language pack (stdlib ast; 4 fixes)", "status": "done" },
+    "M3": { "title": "Generic OTel backend adapter + real span verify", "status": "done" },
+    "M4": { "title": "Discovery -> committed config + resolution protocol + drift", "status": "done" },
+    "M5": { "title": "Harness adapters (Claude Code + Codex) + MCP verifier", "status": "done" },
+    "M6": { "title": "TypeScript pack + native backends (Braintrust/LangSmith) + CI mode", "status": "done" }
   },
-  "next_task": "M1: define plan-record/boundary JSON contracts end-to-end and wire CLI subcommands to no-op handlers that read/write them.",
-  "notes": "Cross-session state record (structured JSON so agents don't inappropriately edit it). See docs/IMPLEMENTATION_PLAN.md for full sequencing."
+  "e2e_verified": "Python x OTel x testclient: discover -> classify -> (red) verify -> fix -> (green) verify -> idempotent. 30 tests green; the gigaphone CLI onboard prints a 3/3 nested+complete report.",
+  "axes": {
+    "harness": ["claude-code", "codex"],
+    "language": ["python (full)", "typescript (lexical v1)"],
+    "vendor": ["otel (full + e2e verify)", "braintrust (native, contextvars family)", "langsmith (native, contextvars family)"],
+    "codebase": "discovered config (gigaphone.boundaries.yaml)"
+  },
+  "next_task": "v2: tree-sitter-backed TS parsing + run the TS pack through a TS testclient e2e; Arize/Phoenix + Logfire backends; richer interprocedural def-use; package the harness plugins to the marketplaces.",
+  "notes": "Structured cross-session state (JSON so agents don't inappropriately edit it). The four fixes (trace_boundary/restore_context/map_output, plus advisory no_boundary) are real and tested. TS pack is parserless (lexical) in v1 per ADR-0007; not yet exercised by an e2e."
 }

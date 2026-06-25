@@ -1,0 +1,6 @@
+[
+  {
+    "on": "post-edit",
+    "run": "gigaphone detect --repo . || true"
+  }
+]

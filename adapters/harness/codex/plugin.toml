@@ -1,0 +1,7 @@
+name = "gigaphone"
+version = "0.5.0"
+description = "Trace-coverage instrumentation for AI agent tool executions — neutral across harness, language, vendor, and codebase."
+
+[mcp_servers.gigaphone]
+command = "python"
+args = ["-m", "gigaphone.mcp.server"]

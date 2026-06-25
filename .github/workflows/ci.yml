@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Lint
+        run: uv run --extra dev ruff check src tests
+      - name: Format check
+        run: uv run --extra dev ruff format --check src tests
+      - name: Tests
+        run: uv run --extra dev pytest -q
+
+  coverage-regression:
+    # Head-less CI mode (DESIGN §13): off the committed config, fail if anyone adds an
+    # untraced/lossy/off-context tool boundary that the fixes haven't covered.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Onboard the bundled testclient and verify coverage
+        run: |
+          set -e
+          TMP=$(mktemp -d)
+          cp -r testclient/app "$TMP/app"
+          uv run --extra dev gigaphone onboard --repo "$TMP" --scope app --module app.run_representative

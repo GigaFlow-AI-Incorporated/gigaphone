@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    {
+      "name": "gigaphone",
+      "source": "./",
+      "description": "Trace-coverage instrumentation for AI agent tool executions \u2014 neutral across harness, language, vendor, and codebase."
+    }
+  ]
+}

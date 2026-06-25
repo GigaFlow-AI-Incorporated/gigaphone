@@ -5,4 +5,4 @@ vendor, or codebase — each lives behind an interface (``gigaphone.interfaces``
 discovered config (``gigaphone.boundaries.yaml``). See ADR-0002.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
