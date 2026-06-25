@@ -28,11 +28,13 @@ class ClaudeCodeAdapter(HarnessAdapter):
         return {"mcpServers": {PLUGIN["name"]: PLUGIN["mcp_server"]}}
 
     def hook(self, event: str, command: str) -> dict:
-        # Claude Code event hooks (PostToolUse) — type=command keeps it portable.
+        # hooks/hooks.json shape — the map is wrapped under a top-level "hooks" key.
         return {
-            "PostToolUse": [
-                {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": command}]}
-            ]
+            "hooks": {
+                "PostToolUse": [
+                    {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": command}]}
+                ]
+            }
         }
 
     def drive(self, task: Any) -> Any:
