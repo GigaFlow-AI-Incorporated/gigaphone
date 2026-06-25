@@ -1,5 +1,11 @@
 # Implementation Plan — v1
 
+> **Status: v1 shipped (M0–M6 done).** The full pipeline runs end-to-end; see
+> `progress.json` for per-milestone status and the e2e-verified path. This document is
+> kept as the record of how it was sequenced and what each milestone delivered. Remaining
+> work (tree-sitter-backed TS, a TS e2e, Arize/Logfire backends, marketplace packaging) is
+> v2 — see §"v2" in `docs/DESIGN.md` and `progress.json.next_task`.
+
 Sequenced depth-first per harness-engineering: build a small block, verify it, then
 unlock the next. Each milestone is shippable and testable on its own. The neutral
 core lands first so every axis has a stable spine to plug into.

@@ -66,22 +66,55 @@ Properties of the customer's code, invariant on all four axes; only the fix prim
 
 ## Status
 
-**Draft v0.4 — scaffold.** This repository is the harness-engineered skeleton; v1
-implementation is sequenced in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
-Full design: [`docs/DESIGN.md`](docs/DESIGN.md).
+**v1 — working end-to-end.** The full pipeline runs over a real agent codebase:
+discover → classify → fix → verify. Try it on the bundled testclient:
+
+```bash
+TMP=$(mktemp -d); cp -r testclient/app "$TMP/app"
+gigaphone onboard --repo "$TMP" --scope app --module app.run_representative
+# Harness: cli · Language: python · Backend: otel
+# 3 tools · 1 untraced · 1 off-context · 1 lossy
+# Fixed + verified 3/3 tool spans (nested + complete).
+```
+
+What's implemented:
+
+- **Engine**: discovery → committed config, deterministic localization, the four fixes
+  (`trace_boundary` / `restore_context` / `map_output`, plus advisory `no_boundary`),
+  idempotent diffs, real verification, resolution protocol, drift detection, head-less CI.
+- **Language axis**: Python pack (full, stdlib `ast` per [ADR-0007](docs/adr/0007-python-pack-uses-stdlib-ast.md));
+  TypeScript pack (lexical v1).
+- **Vendor axis**: generic OTel (full + e2e-verified via in-process span capture);
+  Braintrust + LangSmith native adapters (contextvars family).
+- **Harness axis**: Claude Code + Codex adapters generated from one manifest source; MCP
+  verifier server (`gigaphone.mcp.server`).
+- **Codebase axis**: discovered `gigaphone.boundaries.yaml`.
+
+**e2e-verified path:** Python × OTel × the testclient (the hand-rolled gateway is
+discovered; all three failure modes are reproduced, fixed, and confirmed nested + complete
+by running the app). The TS pack and native backends are unit-tested but not yet behind a
+live e2e. Roadmap: [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md). Full
+design: [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Repository layout
 
 ```
-AGENTS.md                     thin pointer file for agents (routing + commands + prohibitions)
-docs/DESIGN.md                full design spec (v0.4)
-docs/IMPLEMENTATION_PLAN.md   v1 phasing
-docs/adr/                     architecture decision records (immutable)
-docs/golden-principles.md     mechanical rules enforced on every change
-.agents/skills/gigaphone/     shared SKILL.md body (discovery + resolution protocols)
-src/gigaphone/                neutral core: CLI, classifier, plan records, interfaces
-packs/{python,typescript}/    language packs (grammar + queries + def-use + emitters)
-adapters/backend/             backend adapters (otel, braintrust, langsmith)
-adapters/harness/             harness wrappers (claude_code, codex)
-progress.json                 cross-session state
+AGENTS.md                          thin pointer file (routing + commands + prohibitions)
+docs/DESIGN.md                     full design spec (v0.4)
+docs/IMPLEMENTATION_PLAN.md        milestone record (v1 shipped)
+docs/adr/                          architecture decision records (immutable)
+docs/golden-principles.md          mechanical rules enforced on every change
+.agents/skills/gigaphone/          shared SKILL.md body (discovery + resolution protocols)
+src/gigaphone/
+  cli.py · config.py               CLI engine + boundary-config I/O
+  core/                            neutral model: boundary/plan-record/classifier types
+  interfaces/                      the 3 pluggable code axes (language/backend/harness)
+  engine/                          discover · detect · plan · resolve · fix · verify · report
+  packs/{python,typescript}/       language packs
+  adapters/backend/{otel,braintrust,langsmith}/   backend adapters
+  adapters/harness/{claude_code,codex}/           harness adapters (one manifest source)
+  runtime/                         fix-time shims imported by patched code
+  mcp/server.py                    MCP verifier server
+testclient/                        onboarding e2e fixture (hand-rolled gateway + 3 tools)
+progress.json                      cross-session state
 ```

@@ -1,0 +1,6 @@
+interface:
+  display_name: GigaPhone
+  short_description: "Trace-coverage instrumentation for AI agent tool executions\
+    \ \u2014 neutral across harness, language, vendor, and codebase."
+policy:
+  allow_implicit_invocation: true

@@ -12,12 +12,12 @@ from gigaphone.core import BoundaryKind, FailureMode, PlanRecord, Source
 
 
 def test_version_is_set():
-    assert __version__ == "0.4.0"
+    assert __version__ == "0.5.0"
 
 
-def test_cli_lists_the_six_subcommands():
+def test_cli_lists_the_six_canonical_subcommands():
     names = {name for name, _ in COMMANDS}
-    assert names == {"discover", "detect", "plan", "resolve", "fix", "verify"}
+    assert {"discover", "detect", "plan", "resolve", "fix", "verify"} <= names
 
 
 def test_cli_version_flag_exits_zero(capsys):
@@ -29,9 +29,11 @@ def test_cli_no_args_prints_help_exits_zero():
     assert main([]) == 0
 
 
-def test_cli_stub_subcommand_signals_not_implemented():
-    # Documented stub at scaffold stage — non-zero so CI never mistakes a stub for success.
-    assert main(["plan"]) != 0
+def test_cli_plan_runs_on_an_empty_repo(tmp_path, capsys):
+    # No config + no code -> an empty plan, exit 0 (real command, no longer a stub).
+    assert main(["plan", "--repo", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert '"records": []' in out
 
 
 def test_plan_record_round_trips_through_json_shape():
