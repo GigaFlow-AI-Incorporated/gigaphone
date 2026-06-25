@@ -1,0 +1,14 @@
+{
+  "name": "gigaphone",
+  "owner": {
+    "name": "Gigaflow"
+  },
+  "description": "GigaPhone — trace-coverage instrumentation for AI agent codebases.",
+  "plugins": [
+    {
+      "name": "gigaphone",
+      "source": ".",
+      "description": "Trace-coverage instrumentation for AI agent tool executions — neutral across harness, language, vendor, and codebase."
+    }
+  ]
+}

@@ -77,6 +77,25 @@ gigaphone onboard --repo "$TMP" --scope app --module app.run_representative
 # Fixed + verified 3/3 tool spans (nested + complete).
 ```
 
+### Install as a Claude Code plugin
+
+The repo root is itself a Claude Code plugin **and** a single-plugin marketplace
+(validated with `claude plugin validate . --strict`; installs with status ✔ enabled —
+skill + post-edit hook + MCP server). Requires [`uv`](https://docs.astral.sh/uv/) on PATH;
+the engine is launched from the cloned plugin via `uv run`, so there is no separate
+install step.
+
+```
+claude plugin marketplace add GigaFlow-AI-Incorporated/gigaphone
+claude plugin install gigaphone@gigaphone
+```
+
+This wires the MCP verifier (`gigaphone` tools: discover / plan / fix / verify), the shared
+`SKILL.md`, and a `PostToolUse` hook that re-checks coverage as you edit. **Codex**: point
+it at the repo — the skill is at `.agents/skills/gigaphone/`; the package manifest is
+`adapters/harness/codex/`. Both manifests are generated from one source
+(`src/gigaphone/adapters/harness/manifest.py`) by `scripts/build_plugins.py`.
+
 What's implemented:
 
 - **Engine**: discovery → committed config, deterministic localization, the four fixes

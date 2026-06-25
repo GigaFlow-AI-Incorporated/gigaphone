@@ -1,6 +1,8 @@
-[
-  {
-    "on": "post-edit",
-    "run": "gigaphone detect --repo . || true"
-  }
-]
+{
+  "hooks": [
+    {
+      "on": "post-edit",
+      "run": "uv run --project \"${CLAUDE_PLUGIN_ROOT}\" gigaphone detect --repo \"${CLAUDE_PROJECT_DIR}\" || true"
+    }
+  ]
+}
