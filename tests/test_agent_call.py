@@ -39,3 +39,23 @@ def test_agent_call_descriptor_localizes_as_untraced_with_agent_emit():
     prim = OtelAdapter().primitive_for(b, FailureMode.UNTRACED)
     assert 'kind="agent"' in prim.decorator
     assert prim.emit_name == "harness.subagent.openai-agents"
+
+
+def test_catalog_recognizes_known_call_signatures():
+    from gigaphone.packs.python import agent_sdks
+
+    # langgraph-style: a `.invoke` suffix; openai-agents: `Runner.run`
+    assert agent_sdks.match_call_site("graph.invoke").framework == "langgraph"
+    assert agent_sdks.match_call_site("Runner.run").framework == "openai-agents"
+    # a plain method named invoke on an llm client must NOT be force-matched by exact name only
+    assert agent_sdks.match_call_site("os.path.join") is None
+
+
+def test_catalog_entry_formatter_round_trips_shape():
+    from gigaphone.packs.python import agent_sdks
+
+    block = agent_sdks.format_entry(
+        "acme-agents", "acme-agents", calls=("AcmeRunner.run",), output_fields=("final",)
+    )
+    assert "AcmeRunner.run" in block
+    assert "acme-agents" in block
