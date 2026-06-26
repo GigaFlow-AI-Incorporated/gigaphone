@@ -4,8 +4,7 @@
 
 When an AI agent runs a tool (especially a code-execution tool), the result has to show up
 in your observability backend as a span **nested under the agent's trace with the full
-input and output**. If it doesn't, your eval/scoring platform can't see it — and these
-outputs are constantly lost during onboarding, which is what blocks activation. GigaPhone
+input and output**. If it doesn't, your eval/scoring platform can't see it. GigaPhone
 finds the gaps, fixes them with reviewable edits, and **proves** the spans land by running
 your code.
 
@@ -27,8 +26,8 @@ claude plugin install gigaphone@gigaphone
 
 **No dependencies.** The engine is pure standard-library Python, so the plugin runs on a
 bare `python3` (3.9+, e.g. your system interpreter) — there is **no pip / uv / venv step**.
-Installing wires up a guided skill, an MCP server, and a post-edit hook that keeps coverage
-from regressing.
+Installing wires up a guided skill (which runs the engine via its CLI on demand) and a
+post-edit hook that keeps coverage from regressing.
 
 *(Codex: point it at the repo — the skill lives at `.agents/skills/gigaphone/`.)*
 
