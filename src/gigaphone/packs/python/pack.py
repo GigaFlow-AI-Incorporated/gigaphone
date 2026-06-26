@@ -456,8 +456,44 @@ def _match_direct(fn, imports: dict):
     return None
 
 
+_CARRIER_METHODS = agent_sdks.carrier_methods()
+
+
+def _has_carrier(fn) -> bool:
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
+            if n.func.attr in _CARRIER_METHODS:
+                return True
+    return False
+
+
+def _local_helper_bodies(fn, funcs):
+    """fn plus one hop into any locally-defined function fn calls."""
+    bodies = [fn]
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Call):
+            tail = _attr_chain(n.func).rsplit(".", 1)[-1]
+            helper = funcs.by_name.get(tail)
+            if helper is not None and helper is not fn:
+                bodies.append(helper)
+    return bodies
+
+
 def _match_construct_carrier(fn, imports: dict, funcs):
-    return None  # implemented in R3
+    """fn carries an outbound call AND constructs a catalogued symbol (here or one hop),
+    with the construct's origin resolving to that SDK's package."""
+    if not _has_carrier(fn):
+        return None
+    for body in _local_helper_bodies(fn, funcs):
+        binds = _local_binds(body, imports)
+        for n in ast.walk(body):
+            if isinstance(n, ast.Call):
+                symbol = _attr_chain(n.func).rsplit(".", 1)[-1]
+                pkg = _root_pkg(_origin(n.func, binds, imports))
+                sdk = agent_sdks.match_construct(symbol, pkg)
+                if sdk is not None:
+                    return sdk
+    return None
 
 
 def _find_span_with(fn: ast.FunctionDef) -> ast.With | None:

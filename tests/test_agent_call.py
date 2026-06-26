@@ -196,3 +196,47 @@ def test_unresolvable_param_receiver_does_not_match(tmp_path):
         "    return graph.invoke(state)\n",
     )
     assert not any(d.kind.value == "agent_call" for d in descs)
+
+
+def test_construct_carrier_same_function(tmp_path):
+    descs = _discover_src(
+        tmp_path, "s.py",
+        "from __future__ import annotations\n"
+        "from openhands.sdk import Agent\n"
+        "import httpx\n\n"
+        "def start(task, client):\n"
+        "    agent = Agent(model='x')\n"
+        "    return client.post('http://a/api/conversations', json={'a': agent})\n",
+    )
+    assert any(d.kind.value == "agent_call" and d.match_call == "s.start" for d in descs)
+
+
+def test_construct_in_helper_carrier_in_poster_DIFFERENT_functions(tmp_path):
+    descs = _discover_src(
+        tmp_path, "svc.py",
+        "from __future__ import annotations\n"
+        "from openhands.sdk import Agent\n"
+        "from openhands.models import StartConversationRequest\n"
+        "import httpx\n\n"
+        "def _build_request(task):\n"
+        "    return StartConversationRequest(agent=Agent(model='x'))\n\n"
+        "async def _start_app_conversation(task, client):\n"
+        "    req = _build_request(task)\n"
+        "    return await client.post('http://a/api/conversations', json=req)\n",
+    )
+    agent = next((d for d in descs if d.kind.value == "agent_call"), None)
+    assert agent is not None and agent.match_call == "svc._start_app_conversation"
+    assert agent.emit_name == "svc.subagent.openhands-sdk"
+
+
+def test_arbitrary_agent_plus_post_without_framework_provenance_does_not_match(tmp_path):
+    descs = _discover_src(
+        tmp_path, "x.py",
+        "from __future__ import annotations\n"
+        "from mylib import Agent\n"
+        "import httpx\n\n"
+        "def handle(client):\n"
+        "    a = Agent()\n"
+        "    return client.post('http://a/x', json={'a': a})\n",
+    )
+    assert not any(d.kind.value == "agent_call" for d in descs)
