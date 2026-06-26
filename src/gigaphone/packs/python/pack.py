@@ -285,6 +285,16 @@ class PythonPack(LanguagePack):
 
     # --------------------------------------------------------------------- fix emission
     def emit_fix(self, boundary: Boundary, primitive: FixPrimitive, source: str) -> CodeEdit | None:
+        if (
+            primitive.failure_mode == FailureMode.UNTRACED
+            and boundary.kind == BoundaryKind.AGENT_CALL
+        ):
+            span_name = boundary.emit_name or f"{boundary.provider_or_framework}.{boundary.func_name}"
+            edit = native_otel_body_wrap(source, boundary.func_name, span_name, "agent")
+            if edit is not None:
+                edit.path = boundary.path
+            return edit
+
         smap = SourceMap(source)
         import_byte = _import_insert_offset(source, smap)
         import_hunk = Hunk(

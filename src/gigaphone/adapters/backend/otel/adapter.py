@@ -99,6 +99,10 @@ class OtelAdapter(BackendAdapter):
         boundary still carries a failure mode, so ``verify`` is stateless (ADR-0005)."""
         tool = boundary.tools_covered[0] if boundary.tools_covered else boundary.func_name
         span_name = boundary.existing_span_name or boundary.emit_name or boundary.func_name
+        if boundary.kind == BoundaryKind.AGENT_CALL:
+            # native body-wrap: assert the dispatch span is present + nested under the agent
+            # root; a streamed dispatch has no single return to assert completeness on.
+            return Expectation(tool, span_name, require_nested=True, require_attrs=[])
         attrs = (
             [f"gigaphone.output.{f}" for f in boundary.complete_output_fields]
             if boundary.requires_complete_attrs
