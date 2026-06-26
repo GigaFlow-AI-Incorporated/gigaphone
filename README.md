@@ -1,141 +1,144 @@
 # GigaPhone
 
-**Trace-coverage instrumentation for AI agent codebases — neutral across harness,
-language, vendor, and codebase.**
+**Get your AI agent's tool outputs into your traces — nested, complete, and verified.**
 
-GigaPhone runs over a customer's codebase and guarantees that AI agent **tool
-executions** — especially code-execution tools — are logged to the customer's
-observability platform as properly nested spans with complete inputs and outputs.
-If a tool's output never lands in the trace, an eval platform cannot see or score
-it. Those outputs are frequently lost during onboarding, which blocks activation.
-GigaPhone detects the gaps, remediates them with reviewable idempotent edits, and
-verifies the result against the live project.
+When an AI agent runs a tool (especially a code-execution tool), the result has to show up
+in your observability backend as a span **nested under the agent's trace with the full
+input and output**. If it doesn't, your eval/scoring platform can't see it — and these
+outputs are constantly lost during onboarding, which is what blocks activation. GigaPhone
+finds the gaps, fixes them with reviewable edits, and **proves** the spans land by running
+your code.
 
-> The naive version of this tool adds a tracing decorator wherever one is missing.
-> That is wrong. The real problem is rarely "no decorator" — it is that the tool
-> result is produced *outside* the agent's span context, or logged in a *lossy*
-> shape, so it disappears or lands in a detached trace. GigaPhone is a
-> span-coverage **diagnostic and remediation** tool, and that diagnosis is identical
-> across every harness, language, vendor, and codebase.
+> The naive tool "adds a tracing decorator wherever one is missing." That's wrong. The real
+> problem is rarely a missing decorator — it's that the tool result is produced *outside* the
+> agent's span context, or logged in a *lossy* shape, so it disappears or lands in a detached
+> trace. GigaPhone diagnoses **which** of those is happening and fixes that.
 
-## The four axes of neutrality
+---
 
-| Axis | What varies | How it plugs in |
-|------|-------------|-----------------|
-| **Harness** | how GigaPhone is driven & packaged (Claude Code, Codex; later Hermes, Cursor, Gemini) | harness adapter (`adapters/harness/`) |
-| **Language** | the codebase's language (Python, TypeScript in v1) | language pack (`packs/`) |
-| **Vendor** | where spans are emitted & verified (Braintrust, LangSmith, Arize, Logfire, any OTLP) | backend adapter (`adapters/backend/`) |
-| **Codebase** | the shape of *this* customer's code, esp. the LLM gateway | discovered **config**, not code (`gigaphone.boundaries.yaml`) |
+## Install
 
-The first three are pluggable **code** interfaces; the fourth is externalized **data**
-learned by discovery. The engine carries zero built-in assumptions about a specific
-harness, language, vendor, or codebase — each lives behind an interface or in config.
-Axes compose freely (e.g. Codex × TypeScript × LangSmith × Acme's gateway).
-
-## Core thesis
-
-For an agent to act on a tool result, that result must return into the agent's
-process and be handed to the model. There is always an **in-process consumption
-boundary** that feeds execution output back to the agent, running on the normal
-call stack inside the agent's span context. That seam is the correct and sufficient
-place to instrument — regardless of how the sandbox runs the code (subprocess,
-Docker, E2B, remote worker). Discovery finds that seam without hardcoding anything.
-See [ADR-0003](docs/adr/0003-trace-the-consumption-boundary.md).
-
-## CLI
-
-```
-gigaphone discover   # scan (optionally scoped) → propose boundary descriptors to confirm
-gigaphone detect     # run language-pack queries for confirmed anchors → candidate boundaries
-gigaphone plan       # plan records (+ unresolved[] list)
-gigaphone resolve    # ingest an agent-supplied resolution for an unresolved boundary
-gigaphone fix        # apply codemods via backend adapter + language pack; emit diffs
-gigaphone verify     # backend-adapter verify against the live project
-```
-
-## Failure-mode taxonomy
-
-Properties of the customer's code, invariant on all four axes; only the fix primitive differs.
-
-| Mode | What's happening | Fix |
-|------|------------------|-----|
-| `no_boundary` | exec calls inlined / scattered; no single consumption layer | introduce/consolidate, then trace |
-| `untraced` | boundary exists, no span | `trace_boundary(...)`, type = tool |
-| `off_context` | traced but off the agent's context (pool/executor/queue) → orphan trace | `restore_context(...)` |
-| `lossy_output` | traced but logs only the truncated model-facing string | `map_output(...)` from complete-result fields |
-
-## Status
-
-**v1 — working end-to-end.** The full pipeline runs over a real agent codebase:
-discover → classify → fix → verify. Try it on the bundled testclient:
-
-```bash
-TMP=$(mktemp -d); cp -r testclient/app "$TMP/app"
-gigaphone onboard --repo "$TMP" --scope app --module app.run_representative
-# Harness: cli · Language: python · Backend: otel
-# 3 tools · 1 untraced · 1 off-context · 1 lossy
-# Fixed + verified 3/3 tool spans (nested + complete).
-```
-
-### Install as a Claude Code plugin
-
-The repo root is itself a Claude Code plugin **and** a single-plugin marketplace
-(validated with `claude plugin validate . --strict`; installs with status ✔ enabled —
-skill + post-edit hook + MCP server).
+In Claude Code:
 
 ```
 claude plugin marketplace add GigaFlow-AI-Incorporated/gigaphone
 claude plugin install gigaphone@gigaphone
 ```
 
-**No dependencies.** The engine is pure stdlib, so the plugin launches a bare `python3`
-(3.9+ — e.g. the system interpreter) against the cloned source; there is **no pip / uv /
-venv install step**. Installing the plugin wires the MCP verifier (`gigaphone` tools:
-discover / plan / fix / verify), the shared `SKILL.md` (which walks you through the
-onboarding flow and runs the engine on demand), and a `PostToolUse` hook that re-checks
-coverage as you edit. **Codex**: point it at the repo — the skill is at
-`.agents/skills/gigaphone/`; the package manifest is `adapters/harness/codex/`. Both
-manifests are generated from one source (`src/gigaphone/adapters/harness/manifest.py`) by
-`scripts/build_plugins.py`.
+**No dependencies.** The engine is pure standard-library Python, so the plugin runs on a
+bare `python3` (3.9+, e.g. your system interpreter) — there is **no pip / uv / venv step**.
+Installing wires up a guided skill, an MCP server, and a post-edit hook that keeps coverage
+from regressing.
 
-What's implemented:
+*(Codex: point it at the repo — the skill lives at `.agents/skills/gigaphone/`.)*
 
-- **Engine**: discovery → committed config, deterministic localization, the four fixes
-  (`trace_boundary` / `restore_context` / `map_output`, plus advisory `no_boundary`),
-  idempotent diffs, real verification, resolution protocol, drift detection, head-less CI.
-- **Language axis**: Python pack (full, stdlib `ast` per [ADR-0007](docs/adr/0007-python-pack-uses-stdlib-ast.md));
-  TypeScript pack (lexical v1).
-- **Vendor axis**: generic OTel (full + e2e-verified via in-process span capture);
-  Braintrust + LangSmith native adapters (contextvars family).
-- **Harness axis**: Claude Code + Codex adapters generated from one manifest source; MCP
-  verifier server (`gigaphone.mcp.server`).
-- **Codebase axis**: discovered `gigaphone.boundaries.yaml`.
+## Get started — instrument your agent in minutes
 
-**e2e-verified path:** Python × OTel × the testclient (the hand-rolled gateway is
-discovered; all three failure modes are reproduced, fixed, and confirmed nested + complete
-by running the app). The TS pack and native backends are unit-tested but not yet behind a
-live e2e. Roadmap: [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md). Full
-design: [`docs/DESIGN.md`](docs/DESIGN.md).
+1. **Install** the plugin (above).
+2. **Open your agent's repo in Claude Code** and just say what you want:
+   > *"My agent's tool outputs aren't showing up in our traces — instrument them."*
 
-## Repository layout
+   GigaPhone takes it from there and **walks you through it**, gated at every step:
+
+   | Step | What happens |
+   |------|--------------|
+   | **Discover** | finds your LLM gateway and tools — even a hand-rolled gateway with no SDK — and asks you to confirm |
+   | **Diagnose** | tells you, per tool, *why* its output is missing (not traced / detached / truncated) |
+   | **Fix** | shows each edit as a **diff you approve** — idempotent, minimal, no reformatting |
+   | **Verify** | runs a representative path and confirms each tool span is **nested + complete** in your backend |
+
+   Nothing changes without your approval, and nothing is called "fixed" until verify passes.
+   The result is committed as `gigaphone.boundaries.yaml` so future and CI runs stay deterministic.
+
+3. **Kick the tires first** (zero deps, bare `python3`) on the bundled example app:
+   ```bash
+   git clone https://github.com/GigaFlow-AI-Incorporated/gigaphone && cd gigaphone
+   TMP=$(mktemp -d); cp -r testclient/app "$TMP/app"
+   PYTHONPATH=src python3 -m gigaphone.cli discover --repo "$TMP" --scope app
+   PYTHONPATH=src python3 -m gigaphone.cli fix --repo "$TMP" --scope app --apply   # prints the diffs
+   ```
+   `verify` then runs your representative path to confirm coverage. (The bundled demo app
+   itself uses OpenTelemetry; install it — `pip install opentelemetry-sdk` — to run the full
+   `onboard` end-to-end on the example.)
+
+## How it works
+
+**The core thesis: trace the consumption boundary; treat the sandbox as a black box.**
+For an agent to act on a tool's result, that result must come back into the agent's process
+and be handed to the model. There is always an **in-process consumption boundary** — the
+function that feeds the execution output back to the agent, running on the normal call stack
+inside the agent's span context. That seam is the correct and sufficient place to
+instrument, *regardless* of how the sandbox ran the code (subprocess, Docker, E2B, a remote
+worker). GigaPhone's whole job is to find that seam and make sure the result crosses it into
+your trace. See [ADR-0003](docs/adr/0003-trace-the-consumption-boundary.md).
 
 ```
-AGENTS.md                          thin pointer file (routing + commands + prohibitions)
-docs/DESIGN.md                     full design spec (v0.4)
-docs/IMPLEMENTATION_PLAN.md        milestone record (v1 shipped)
-docs/adr/                          architecture decision records (immutable)
-docs/golden-principles.md          mechanical rules enforced on every change
-.agents/skills/gigaphone/          shared SKILL.md body (discovery + resolution protocols)
-src/gigaphone/
-  cli.py · config.py               CLI engine + boundary-config I/O
-  core/                            neutral model: boundary/plan-record/classifier types
-  interfaces/                      the 3 pluggable code axes (language/backend/harness)
-  engine/                          discover · detect · plan · resolve · fix · verify · report
-  packs/{python,typescript}/       language packs
-  adapters/backend/{otel,braintrust,langsmith}/   backend adapters
-  adapters/harness/{claude_code,codex}/           harness adapters (one manifest source)
-  runtime/                         fix-time shims imported by patched code
-  mcp/server.py                    MCP verifier server
-testclient/                        onboarding e2e fixture (hand-rolled gateway + 3 tools)
-progress.json                      cross-session state
+                 ┌─ you, in Claude Code / Codex ─┐   ← Harness: drives + packages
+                 │ "instrument my tool outputs"  │
+                 └───────────────┬───────────────┘
+                                 ▼
+   ┌──────────────────  GigaPhone engine (neutral core)  ──────────────────┐
+   │                                                                        │
+   │   discover ─▶ detect ─▶ plan ─▶ fix ─▶ verify ─▶ report                │
+   │   find your   locate    classify apply   run a path,                   │
+   │   gateway +   each       the      review- confirm spans                │
+   │   tools       anchor      gap     able    nested + complete            │
+   │               precisely           diffs                                │
+   │                                                                        │
+   │   parameterized inward by:                                             │
+   │     • Language pack    python · typescript     (parsing + codemods)    │
+   │     • Boundary config  gigaphone.boundaries.yaml  (discovered per repo)│
+   └───────────────────────────────┬───────────────────────────────────────┘
+                                    ▼ emit + verify
+     Backend adapter ▶ OTel/OpenInference · Braintrust · LangSmith · any OTLP
+                                                            ← Vendor: where spans go
 ```
+
+The engine carries **zero built-in assumptions** about any specific harness, language,
+vendor, or codebase — each of those four axes is resolved independently, so they compose
+freely (e.g. Codex × TypeScript × LangSmith × your gateway):
+
+| Axis | What varies | How it plugs in |
+|------|-------------|-----------------|
+| **Harness** | how GigaPhone is driven & packaged (Claude Code, Codex; later Cursor, Gemini…) | harness adapter (`src/gigaphone/adapters/harness/`) |
+| **Language** | the codebase's language (Python, TypeScript) | language pack (`src/gigaphone/packs/`) |
+| **Vendor** | where spans are emitted & verified (Braintrust, LangSmith, Arize, Logfire, any OTLP) | backend adapter (`src/gigaphone/adapters/backend/`) |
+| **Codebase** | the shape of *your* code, especially the LLM gateway | discovered **config**, not code (`gigaphone.boundaries.yaml`) |
+
+The first three are pluggable **code** interfaces; the fourth is externalized **data** that
+discovery learns once and commits. Discovery (the only place a model reasons) produces that
+config; every routine run after that is deterministic — which is why GigaPhone can safely
+edit production code and run head-less in CI.
+
+## Contributing
+
+Because of the four-axis design, most contributions are a small, well-bounded extension
+rather than a change to the core. Pick your axis:
+
+| Want to support… | Add a… | Where |
+|------------------|--------|-------|
+| a new language | **language pack** (parse + def-use + codemod emitters) | `src/gigaphone/packs/<lang>/`, register in `packs/registry.py` |
+| a new observability vendor | **backend adapter** (emit + verify) | `src/gigaphone/adapters/backend/<vendor>/`, register in `adapters/registry.py` |
+| a new agent harness | **harness adapter** (manifest + hooks) | `src/gigaphone/adapters/harness/`, then regenerate plugins |
+| your own gateway shape | **nothing** — it's discovered config, not code | `gigaphone.boundaries.yaml` |
+
+Dev loop (the engine itself is dependency-free; the dev/test tooling is not):
+
+```bash
+uv run --extra dev pytest          # full suite — must pass on Python 3.9 and 3.14
+uv run --extra dev ruff check .    # lint
+uv run --extra dev ruff format .   # format
+```
+
+Guidelines:
+
+- **Keep each axis thin.** Logic must not leak from the neutral core into an adapter/pack —
+  see the architecture rules in [`docs/golden-principles.md`](docs/golden-principles.md) and
+  the decisions in [`docs/adr/`](docs/adr/) (immutable; reverse one with a new ADR, never an edit).
+- **No fix without a red fixture, no coverage without verification.** Every fixable failure
+  mode ships with a breaking test that proves the fix; a tool is only "covered" once a backend
+  `verify()` confirms the span is nested and complete.
+- **Plugin manifests come from one source.** Edit `src/gigaphone/adapters/harness/manifest.py`,
+  then run `python scripts/build_plugins.py` (a test guards that committed files match).
+- `AGENTS.md` is the contributor/agent quick-reference (commands, routing, prohibitions). The
+  full design rationale is in [`docs/DESIGN.md`](docs/DESIGN.md).
