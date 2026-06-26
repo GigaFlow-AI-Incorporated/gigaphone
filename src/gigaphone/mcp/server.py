@@ -37,10 +37,14 @@ TOOLS: dict[str, dict[str, Any]] = {
         "input": {"repo": "str", "scope": "str|None", "apply": "bool"},
     },
     "verify": {
-        "description": "Run the representative path; confirm tool spans nested + complete.",
+        "description": "Run the representative path; confirm one coherent trace tree — every "
+        "LLM and tool span nested + complete, each requested tool linked.",
         "input": {"repo": "str", "module": "str"},
     },
 }
+
+# both the LLM gateway and tool boundaries are verified — every call in the agent loop.
+_VERIFIABLE = ("tool_exec", "llm")
 
 
 def call_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -72,12 +76,17 @@ def call_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
         boundaries = _detect.detect(repo, descriptors, None)
         backend = select_backend(repo)
         expectations = [
-            backend.expectation_for(b) for b in boundaries if b.kind.value == "tool_exec"
+            backend.expectation_for(b) for b in boundaries if b.kind.value in _VERIFIABLE
         ]
-        results = _verify.verify(
+        tree = _verify.verify_tree(
             repo, expectations, backend, args.get("module", "app.run_representative")
         )
-        return {"results": [r.__dict__ | {"ok": r.ok} for r in results]}
+        return {
+            "results": [r.__dict__ | {"ok": r.ok} for r in tree.results],
+            "single_root": tree.single_root,
+            "linkage": [link.__dict__ for link in tree.linkage],
+            "ok": tree.ok,
+        }
     raise ValueError(f"unknown tool: {name}")
 
 
