@@ -183,14 +183,21 @@ class PythonPack(LanguagePack):
             call=d.match_call,
             range=rng,
             complete_output_fields=list(d.output_paths),
-            tools_covered=[d.id.replace("tool-", "")] if d.kind == BoundaryKind.TOOL_EXEC else [],
+            tools_covered=(
+                [d.id.split("-", 1)[-1]]
+                if d.kind in (BoundaryKind.TOOL_EXEC, BoundaryKind.AGENT_CALL)
+                else []
+            ),
             provider_or_framework=_proj(module),
             source=Source.SPEC,
         )
         b.emit_name = d.emit_name
 
         # complete output fields: infer from the return type if the descriptor didn't say.
-        if not b.complete_output_fields and d.kind == BoundaryKind.TOOL_EXEC:
+        if not b.complete_output_fields and d.kind in (
+            BoundaryKind.TOOL_EXEC,
+            BoundaryKind.AGENT_CALL,
+        ):
             b.complete_output_fields = _infer_output_fields(fn, funcs)
 
         # already fixed by a decorator (idempotent) -> covered, but record the span name +
