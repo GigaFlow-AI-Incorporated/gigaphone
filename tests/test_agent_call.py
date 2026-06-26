@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from gigaphone.adapters.backend.otel import OtelAdapter
 from gigaphone.core.boundary import BoundaryKind, FailureMode
-from gigaphone.core.model import Boundary, Descriptor, Range
+from gigaphone.core.model import Descriptor
 from gigaphone.engine import discover as _discover
 from gigaphone.packs.python.pack import PythonPack
 
@@ -63,7 +63,10 @@ def test_catalog_matches_method_only_with_package_provenance():
 def test_catalog_matches_construct_with_package_provenance():
     from gigaphone.packs.python import agent_sdks
 
-    assert agent_sdks.match_construct("StartConversationRequest", "openhands").framework == "openhands-sdk"
+    assert (
+        agent_sdks.match_construct("StartConversationRequest", "openhands").framework
+        == "openhands-sdk"
+    )
     assert agent_sdks.match_construct("Agent", "openhands").framework == "openhands-sdk"
     assert agent_sdks.match_construct("Agent", "langchain") is None
 

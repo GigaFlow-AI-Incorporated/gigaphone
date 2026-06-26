@@ -461,8 +461,11 @@ _CARRIER_METHODS = agent_sdks.carrier_methods()
 
 def _has_carrier(fn) -> bool:
     for n in ast.walk(fn):
-        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
-            if n.func.attr in _CARRIER_METHODS:
+        if (
+            isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr in _CARRIER_METHODS
+        ):
                 return True
     return False
 

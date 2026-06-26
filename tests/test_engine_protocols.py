@@ -6,6 +6,7 @@ from gigaphone import config
 from gigaphone.core.boundary import BoundaryKind
 from gigaphone.core.model import Descriptor
 from gigaphone.engine.resolve import ingest_resolution
+from gigaphone.engine.review import apply_review
 
 
 def test_config_round_trips(tmp_path):
@@ -62,13 +63,18 @@ def test_drift_when_a_committed_anchor_no_longer_resolves():
     assert drift == ["app.tools.gone"]
 
 
-from gigaphone.engine.review import apply_review
-
-
 def test_review_rejects_false_positives_and_adds_missed():
     descriptors = [
-        Descriptor(id="tool-get_docker_client", kind=BoundaryKind.TOOL_EXEC, match_call="app.sandbox.get_docker_client"),
-        Descriptor(id="tool-is_valid_git_branch_name", kind=BoundaryKind.TOOL_EXEC, match_call="app.utils.is_valid_git_branch_name"),
+        Descriptor(
+            id="tool-get_docker_client",
+            kind=BoundaryKind.TOOL_EXEC,
+            match_call="app.sandbox.get_docker_client",
+        ),
+        Descriptor(
+            id="tool-is_valid_git_branch_name",
+            kind=BoundaryKind.TOOL_EXEC,
+            match_call="app.utils.is_valid_git_branch_name",
+        ),
     ]
     review = {
         "reject": ["tool-get_docker_client", "tool-is_valid_git_branch_name"],
@@ -96,7 +102,9 @@ def test_review_keeps_unmentioned_and_dedupes_by_call():
         Descriptor(id="a", kind=BoundaryKind.TOOL_EXEC, match_call="app.x.run"),
         Descriptor(id="b", kind=BoundaryKind.LLM, match_call="app.gw.chat"),
     ]
-    review = {"add": [{"id": "a2", "kind": "agent_call", "match_call": "app.x.run", "emit_name": "e"}]}
+    review = {
+        "add": [{"id": "a2", "kind": "agent_call", "match_call": "app.x.run", "emit_name": "e"}]
+    }
     updated, summary = apply_review(descriptors, review)
     by_call = {d.match_call: d for d in updated}
     assert set(by_call) == {"app.x.run", "app.gw.chat"}  # llm kept, run overridden by the add

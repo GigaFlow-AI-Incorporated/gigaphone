@@ -18,7 +18,8 @@ class AgentSdk:
     calls: tuple[str, ...] = ()  # dotted-suffix call signatures, e.g. "Runner.run", ".invoke"
     constructs: tuple[str, ...] = ()  # constructed symbols that signal an agent, e.g. "Agent"
     carriers: tuple[str, ...] = ()  # outbound carriers paired with a construct, e.g. ".post"
-    packages: tuple[str, ...] = ()  # package names for provenance lookups, e.g. "agents", "langgraph"
+    # package names for provenance lookups, e.g. "agents", "langgraph"
+    packages: tuple[str, ...] = ()
     input_arg: str | None = None
     output_fields: tuple[str, ...] = field(default_factory=tuple)
 

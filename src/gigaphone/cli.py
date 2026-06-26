@@ -27,7 +27,11 @@ COMMANDS: list[tuple[str, str]] = [
     ("detect", "run language-pack queries for confirmed anchors → candidate boundaries"),
     ("plan", "emit plan records (+ an unresolved[] list)"),
     ("resolve", "ingest an agent-supplied resolution.json for an unresolved boundary"),
-    ("review", "ingest a harness review.json: reject false positives + add missed boundaries → rewrite config"),
+    (
+        "review",
+        "ingest a harness review.json: reject false positives"
+        " + add missed boundaries → rewrite config",
+    ),
     ("fix", "apply codemods via the backend adapter + language pack; emit diffs"),
     ("verify", "backend-adapter verify against the live project"),
     ("onboard", "run discover → fix → verify and print the onboarding report"),

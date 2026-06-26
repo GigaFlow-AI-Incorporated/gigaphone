@@ -46,7 +46,8 @@ def test_agent_wrapper_red_then_green_then_idempotent(repo):
     after = _verify.verify(repo, expectations, backend, module="harness.run_representative")
     assert all(v.ok for v in after), [(v.tool, v.detail) for v in after]
 
-    src = open(os.path.join(repo, "harness", "service.py"), encoding="utf-8").read()
+    with open(os.path.join(repo, "harness", "service.py"), encoding="utf-8") as f:
+        src = f.read()
     assert 'kind="agent"' in src
 
     boundaries2 = _detect.detect(repo, descs, "harness")
@@ -57,7 +58,9 @@ def test_agent_wrapper_red_then_green_then_idempotent(repo):
 def test_cli_onboard_actually_verifies_agent_call(repo, capsys):
     from gigaphone.cli import main
 
-    rc = main(["onboard", "--repo", repo, "--scope", "harness", "--module", "harness.run_representative"])
+    rc = main(
+        ["onboard", "--repo", repo, "--scope", "harness", "--module", "harness.run_representative"]
+    )
     out = capsys.readouterr().out
     assert rc == 0, out
     # non-vacuous: the single agent_call boundary was fixed AND verified (not 0/0)
