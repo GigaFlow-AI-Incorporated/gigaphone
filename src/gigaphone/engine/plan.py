@@ -49,7 +49,7 @@ def build_plan(descriptors: list[Descriptor], boundaries: list[Boundary]) -> Pla
     unresolved = [
         Unresolved(d.id, d.match_call, _question_for(d))
         for d in descriptors
-        if d.match_call not in resolved_calls and d.kind != BoundaryKind.LLM
+        if d.match_call not in resolved_calls
     ]
     return Plan(records=records, unresolved=unresolved)
 
