@@ -8,6 +8,8 @@ engine talks only to the ``LanguagePack`` interface and never sees ``ast`` (ADR-
 from __future__ import annotations
 
 import ast
+import io
+import tokenize as _tokenize
 
 from gigaphone.core.boundary import BoundaryKind, FailureMode, Source
 from gigaphone.core.model import Boundary, CodeEdit, Descriptor, FixPrimitive, Hunk, Range
@@ -670,6 +672,41 @@ def _dedupe(descriptors: list[Descriptor]) -> list[Descriptor]:
 
 # --- native OTLP body-wrap codemod (Task NM1) ----------------------------------------
 
+# String-like token types that can span multiple physical lines.
+# Built at import time; includes FSTRING_*/TSTRING_* on Python 3.12+ / 3.14+.
+_STRING_TOKEN_TYPES: frozenset[int] = frozenset(
+    getattr(_tokenize, _name)
+    for _name in (
+        "STRING",
+        "FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END",
+        "TSTRING_START", "TSTRING_MIDDLE", "TSTRING_END",
+    )
+    if hasattr(_tokenize, _name)
+)
+
+
+def _multiline_string_interior_lines(body_text: str) -> frozenset[int]:
+    """Return 1-based line numbers that are interior to multi-line string tokens.
+
+    "Interior" means every physical line *after* the opening line of the token,
+    up to and including the line with the closing quote.  These lines must not
+    be re-indented because adding spaces would silently corrupt the string value.
+
+    Falls back to an empty set on ``TokenError`` (tokeniser cannot handle an
+    incomplete fragment) — callers should treat that as "nothing protected".
+    """
+    interior: set[int] = set()
+    try:
+        tokens = list(_tokenize.generate_tokens(io.StringIO(body_text).readline))
+    except _tokenize.TokenError:
+        return frozenset()
+    for tok in tokens:
+        if tok.type in _STRING_TOKEN_TYPES and tok.end[0] > tok.start[0]:
+            for ln in range(tok.start[0] + 1, tok.end[0] + 1):
+                interior.add(ln)
+    return frozenset(interior)
+
+
 def native_otel_body_wrap(
     source: str,
     func_name: str,
@@ -725,21 +762,31 @@ def native_otel_body_wrap(
     # base indentation = col_offset of the first statement to wrap
     base_indent = " " * body_stmts[0].col_offset
 
-    # byte range to replace: line-start of the first stmt to wrap → end of function
+    # byte range to replace: line-start of the first stmt to wrap → start of NEXT line.
+    # Extending to fn.end_lineno + 1 includes the trailing '\n' of the function's last
+    # line so that reassembly never produces a double newline (fix for trailing-\n bug).
     body_start_byte = smap.line_start_offset(body_stmts[0].lineno)
-    body_end_byte = smap.offset(fn.end_lineno, fn.end_col_offset)
+    body_end_byte = smap.line_start_offset(fn.end_lineno + 1)
 
     # extract the original text of the slice we are replacing
     src_bytes = source.encode("utf-8")
     original_body_text = src_bytes[body_start_byte:body_end_byte].decode("utf-8")
 
-    # re-indent every non-blank line by +4 spaces
+    # Determine which physical lines are interior to multi-line string tokens.
+    # Those lines must be passed through verbatim — adding spaces would corrupt
+    # the string value (fix for multi-line string corruption bug).
+    no_indent_lines = _multiline_string_interior_lines(original_body_text)
+
+    # re-indent every non-blank, non-string-interior line by +4 spaces
     reindented_lines: list[str] = []
-    for line in original_body_text.splitlines(keepends=True):
+    for i, line in enumerate(original_body_text.splitlines(keepends=True), start=1):
         stripped = line.rstrip("\n").rstrip("\r")
         if stripped.strip() == "":
             # blank line: no trailing whitespace
             reindented_lines.append("\n")
+        elif i in no_indent_lines:
+            # interior of a multi-line string literal — keep exactly as-is
+            reindented_lines.append(line)
         else:
             reindented_lines.append("    " + line)
     reindented_body = "".join(reindented_lines)

@@ -99,6 +99,51 @@ def test_body_wrap_docstring_preserved_outside_span():
     assert doc_line < with_line
 
 
+WITH_MULTILINE_STRING = """\
+def run(x):
+    sql = \"\"\"
+SELECT *
+FROM t
+\"\"\"
+    return sql
+"""
+
+TWO_FUNC_SOURCE = """\
+def run(x):
+    return x
+
+def other():
+    pass
+"""
+
+
+def test_body_wrap_multiline_string_value_preserved():
+    """Triple-quoted string literal value must not be corrupted by re-indentation."""
+    edit = native_otel_body_wrap(WITH_MULTILINE_STRING, "run", "svc.run", "tool")
+    out = _apply(WITH_MULTILINE_STRING, edit)
+    print("\n--- triple-quoted wrapped output ---")
+    print(repr(out))
+    print("--- end ---")
+    # must still parse
+    tree = ast.parse(out)
+    # find all string constants in the AST
+    constants = [
+        n.value
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+    ]
+    expected = "\nSELECT *\nFROM t\n"
+    assert expected in constants, f"String value corrupted. Constants found: {constants!r}"
+
+
+def test_body_wrap_no_double_trailing_newline():
+    """Wrapping a function in a multi-function file must not introduce extra blank lines."""
+    edit = native_otel_body_wrap(TWO_FUNC_SOURCE, "run", "svc.run", "tool")
+    out = _apply(TWO_FUNC_SOURCE, edit)
+    # Original had one blank line between run and other; must not become two
+    assert "\n\n\n" not in out, f"Extra blank line found:\n{out!r}"
+
+
 def test_body_wrap_returns_none_for_unknown_func():
     assert native_otel_body_wrap(SYNC, "nonexistent", "svc.run", "tool") is None
 
