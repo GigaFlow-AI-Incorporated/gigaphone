@@ -145,3 +145,54 @@ def test_resolution_ingests_agent_call_kind():
     descriptors, unresolvable = ingest_resolution(resolution)
     assert descriptors[0].kind == BoundaryKind.AGENT_CALL
     assert unresolvable == []
+
+
+def _discover_src(tmp_path, name, src):
+    (tmp_path / name).write_text(src)
+    return _discover.discover(str(tmp_path))
+
+
+def test_direct_call_matches_only_with_provenance(tmp_path):
+    descs = _discover_src(
+        tmp_path, "h.py",
+        "from __future__ import annotations\n"
+        "from agents import Runner\n\n"
+        "def run_subagent(task):\n"
+        "    return Runner.run(task)\n",
+    )
+    agent = next((d for d in descs if d.kind.value == "agent_call"), None)
+    assert agent is not None and agent.match_call == "h.run_subagent"
+    assert agent.emit_name == "h.subagent.openai-agents"
+
+
+def test_incidental_run_call_is_not_an_agent_boundary(tmp_path):
+    descs = _discover_src(
+        tmp_path, "u.py",
+        "from __future__ import annotations\n"
+        "import asyncio\n\n"
+        "def call_async_from_sync(coro):\n"
+        "    return asyncio.run(coro)\n",
+    )
+    assert not any(d.kind.value == "agent_call" for d in descs)
+
+
+def test_locally_constructed_receiver_resolves(tmp_path):
+    descs = _discover_src(
+        tmp_path, "g.py",
+        "from __future__ import annotations\n"
+        "from langgraph.graph import StateGraph\n\n"
+        "def run_graph(state):\n"
+        "    graph = StateGraph(state).compile()\n"
+        "    return graph.invoke(state)\n",
+    )
+    assert any(d.kind.value == "agent_call" and d.match_call == "g.run_graph" for d in descs)
+
+
+def test_unresolvable_param_receiver_does_not_match(tmp_path):
+    descs = _discover_src(
+        tmp_path, "p.py",
+        "from __future__ import annotations\n\n"
+        "def run_graph(graph, state):\n"
+        "    return graph.invoke(state)\n",
+    )
+    assert not any(d.kind.value == "agent_call" for d in descs)

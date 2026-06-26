@@ -144,12 +144,12 @@ class PythonPack(LanguagePack):
                     )
                 )
 
-        # 4) agent-SDK dispatch (seed family B): a function whose body calls a known agent
-        #    framework. The sub-agent is a black box by ownership — we wrap this function.
+        # 4) agent-SDK dispatch (seed family B), provenance-gated. Private methods included —
+        #    real dispatches (e.g. _start_app_conversation) are private.
         for name, fn in funcs.by_name.items():
-            if name.startswith("_"):
+            if name.startswith("__"):
                 continue
-            sdk = _match_agent_sdk_fn(fn)
+            sdk = _match_direct(fn, imports) or _match_construct_carrier(fn, imports, funcs)
             if sdk is not None and not any(d.match_call.endswith(f".{name}") for d in out):
                 out.append(
                     Descriptor(
@@ -415,28 +415,49 @@ def _wraps_exec_sink(fn: ast.FunctionDef) -> bool:
     return False
 
 
-def _match_agent_sdk_fn(fn: ast.FunctionDef):
-    """Return the AgentSdk this function dispatches to: either a direct call signature, or
-    a construct (an Agent-config object) that flows into an outbound carrier (the OpenHands
-    shape)."""
-    constructed: set[str] = set()
-    carrier_attrs: set[str] = set()
+def _origin(expr, binds: dict, imports: dict):
+    """Best-effort origin (dotted) of an expression, stdlib-ast only."""
+    if isinstance(expr, ast.Name):
+        return binds.get(expr.id) or imports.get(expr.id)
+    if isinstance(expr, ast.Call):
+        return _origin(expr.func, binds, imports)
+    if isinstance(expr, ast.Attribute):
+        base = _origin(expr.value, binds, imports)
+        return f"{base}.{expr.attr}" if base else None
+    return None
+
+
+def _root_pkg(origin):
+    return origin.split(".")[0] if origin else None
+
+
+def _local_binds(fn, imports: dict) -> dict:
+    """Map locally-assigned names to their origin (var = Constructor(...) / import alias)."""
+    binds: dict = {}
     for n in ast.walk(fn):
-        if isinstance(n, ast.Call):
-            dotted = _attr_chain(n.func)
-            direct = agent_sdks.match_call_site(dotted)
-            if direct is not None and direct.calls:
-                return direct
-            tail = dotted.rsplit(".", 1)[-1]
-            constructed.add(tail)
-            carrier_attrs.add("." + tail)
-    for sdk in agent_sdks.AGENT_SDKS:
-        if sdk.constructs and sdk.carriers:
-            if any(c in constructed for c in sdk.constructs) and any(
-                c in carrier_attrs for c in sdk.carriers
-            ):
+        if isinstance(n, ast.Assign) and isinstance(n.value, (ast.Call, ast.Name, ast.Attribute)):
+            origin = _origin(n.value, binds, imports)
+            if origin:
+                for t in n.targets:
+                    if isinstance(t, ast.Name):
+                        binds[t.id] = origin
+    return binds
+
+
+def _match_direct(fn, imports: dict):
+    """A method call whose receiver resolves to a catalogued SDK package."""
+    binds = _local_binds(fn, imports)
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
+            pkg = _root_pkg(_origin(n.func.value, binds, imports))
+            sdk = agent_sdks.match_package_method(pkg, n.func.attr)
+            if sdk is not None:
                 return sdk
     return None
+
+
+def _match_construct_carrier(fn, imports: dict, funcs):
+    return None  # implemented in R3
 
 
 def _find_span_with(fn: ast.FunctionDef) -> ast.With | None:
