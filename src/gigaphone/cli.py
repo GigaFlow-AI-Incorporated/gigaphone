@@ -20,12 +20,14 @@ from gigaphone.engine import report as _report
 from gigaphone.engine import resolve as _resolve
 from gigaphone.engine import verify as _verify
 from gigaphone.engine.plan import build_plan
+from gigaphone.engine.review import apply_review
 
 COMMANDS: list[tuple[str, str]] = [
     ("discover", "scan (optionally --scope) → propose boundary descriptors → write config"),
     ("detect", "run language-pack queries for confirmed anchors → candidate boundaries"),
     ("plan", "emit plan records (+ an unresolved[] list)"),
     ("resolve", "ingest an agent-supplied resolution.json for an unresolved boundary"),
+    ("review", "ingest a harness review.json: reject false positives + add missed boundaries → rewrite config"),
     ("fix", "apply codemods via the backend adapter + language pack; emit diffs"),
     ("verify", "backend-adapter verify against the live project"),
     ("onboard", "run discover → fix → verify and print the onboarding report"),
@@ -56,6 +58,8 @@ def build_parser() -> argparse.ArgumentParser:
             )
         if name == "resolve":
             p.add_argument("resolution", help="path to resolution.json")
+        if name == "review":
+            p.add_argument("review", help="path to review.json")
     return parser
 
 
@@ -75,6 +79,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "detect": _cmd_detect,
         "plan": _cmd_plan,
         "resolve": _cmd_resolve,
+        "review": _cmd_review,
         "fix": _cmd_fix,
         "verify": _cmd_verify,
         "onboard": _cmd_onboard,
@@ -131,6 +136,24 @@ def _cmd_resolve(args) -> int:
     print(f"resolved {len(new_descriptors)} boundary(ies); {len(unresolvable)} still unresolvable")
     for uid in unresolvable:
         print(f"  ! unresolvable: {uid}", file=sys.stderr)
+    return 0
+
+
+def _cmd_review(args) -> int:
+    with open(args.review, encoding="utf-8") as fh:
+        review = json.load(fh)
+    descriptors = config.load(args.repo)
+    updated, summary = apply_review(descriptors, review)
+    config.save(args.repo, updated)
+    print(
+        f"review applied: -{len(summary['rejected'])} rejected, "
+        f"+{len(summary['added'])} added, {summary['kept']} kept → "
+        f"{config.config_path(args.repo)}"
+    )
+    for rid in summary["rejected"]:
+        print(f"  - rejected: {rid}")
+    for call in summary["added"]:
+        print(f"  + added: {call}")
     return 0
 
 
