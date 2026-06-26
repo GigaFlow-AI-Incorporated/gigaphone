@@ -4,8 +4,7 @@
 
 When an AI agent runs a tool (especially a code-execution tool), the result has to show up
 in your observability backend as a span **nested under the agent's trace with the full
-input and output**. If it doesn't, your eval/scoring platform can't see it — and these
-outputs are constantly lost during onboarding, which is what blocks activation. GigaPhone
+input and output**. If it doesn't, your eval/scoring platform can't see it. GigaPhone
 finds the gaps, fixes them with reviewable edits, and **proves** the spans land by running
 your code.
 
