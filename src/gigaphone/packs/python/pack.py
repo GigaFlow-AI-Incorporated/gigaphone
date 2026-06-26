@@ -290,8 +290,7 @@ class PythonPack(LanguagePack):
             and boundary.kind == BoundaryKind.AGENT_CALL
         ):
             span_name = (
-                boundary.emit_name
-                or f"{boundary.provider_or_framework}.{boundary.func_name}"
+                boundary.emit_name or f"{boundary.provider_or_framework}.{boundary.func_name}"
             )
             edit = native_otel_body_wrap(source, boundary.func_name, span_name, "agent")
             if edit is not None:
@@ -481,7 +480,7 @@ def _has_carrier(fn) -> bool:
             and isinstance(n.func, ast.Attribute)
             and n.func.attr in _CARRIER_METHODS
         ):
-                return True
+            return True
     return False
 
 
@@ -691,8 +690,12 @@ _STRING_TOKEN_TYPES: frozenset[int] = frozenset(
     getattr(_tokenize, _name)
     for _name in (
         "STRING",
-        "FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END",
-        "TSTRING_START", "TSTRING_MIDDLE", "TSTRING_END",
+        "FSTRING_START",
+        "FSTRING_MIDDLE",
+        "FSTRING_END",
+        "TSTRING_START",
+        "TSTRING_MIDDLE",
+        "TSTRING_END",
     )
     if hasattr(_tokenize, _name)
 )

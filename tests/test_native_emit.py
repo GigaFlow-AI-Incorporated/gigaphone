@@ -1,4 +1,5 @@
 """Tests for native OTLP body-wrap codemod (Task NM1)."""
+
 from __future__ import annotations
 
 import ast
@@ -58,7 +59,8 @@ def test_body_wrap_async_stays_async():
     tree = ast.parse(out)
     # The import is prepended, so walk to find the function (not body[0])
     fn = next(
-        n for n in ast.walk(tree)
+        n
+        for n in ast.walk(tree)
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "run"
     )
     assert type(fn).__name__ == "AsyncFunctionDef"
@@ -78,8 +80,10 @@ def test_body_wrap_async_generator_keeps_yield_inside_span():
     assert (len(src_lines[yield_line]) - len(src_lines[yield_line].lstrip())) > (
         len(src_lines[with_line]) - len(src_lines[with_line].lstrip())
     )
-    assert 'span.set_attribute("gigaphone.kind", "agent")' in out or \
-           "span.set_attribute('gigaphone.kind', 'agent')" in out
+    assert (
+        'span.set_attribute("gigaphone.kind", "agent")' in out
+        or "span.set_attribute('gigaphone.kind', 'agent')" in out
+    )
 
 
 def test_body_wrap_idempotent():
@@ -126,9 +130,7 @@ def test_body_wrap_multiline_string_value_preserved():
     tree = ast.parse(out)
     # find all string constants in the AST
     constants = [
-        n.value
-        for n in ast.walk(tree)
-        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+        n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)
     ]
     expected = "\nSELECT *\nFROM t\n"
     assert expected in constants, f"String value corrupted. Constants found: {constants!r}"
@@ -156,7 +158,8 @@ def test_body_wrap_async_gen_output():
     tree = ast.parse(out)
     # Import is prepended — walk to find the function
     fn = next(
-        n for n in ast.walk(tree)
+        n
+        for n in ast.walk(tree)
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "run"
     )
     assert type(fn).__name__ == "AsyncFunctionDef"
