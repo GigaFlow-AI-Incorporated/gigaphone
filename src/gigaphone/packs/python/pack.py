@@ -416,11 +416,25 @@ def _wraps_exec_sink(fn: ast.FunctionDef) -> bool:
 
 
 def _match_agent_sdk_fn(fn: ast.FunctionDef):
-    """Return the AgentSdk whose direct-call signature appears in this function body."""
+    """Return the AgentSdk this function dispatches to: either a direct call signature, or
+    a construct (an Agent-config object) that flows into an outbound carrier (the OpenHands
+    shape)."""
+    constructed: set[str] = set()
+    carrier_attrs: set[str] = set()
     for n in ast.walk(fn):
         if isinstance(n, ast.Call):
-            sdk = agent_sdks.match_call_site(_attr_chain(n.func))
-            if sdk is not None and sdk.calls:
+            dotted = _attr_chain(n.func)
+            direct = agent_sdks.match_call_site(dotted)
+            if direct is not None and direct.calls:
+                return direct
+            tail = dotted.rsplit(".", 1)[-1]
+            constructed.add(tail)
+            carrier_attrs.add("." + tail)
+    for sdk in agent_sdks.AGENT_SDKS:
+        if sdk.constructs and sdk.carriers:
+            if any(c in constructed for c in sdk.constructs) and any(
+                c in carrier_attrs for c in sdk.carriers
+            ):
                 return sdk
     return None
 

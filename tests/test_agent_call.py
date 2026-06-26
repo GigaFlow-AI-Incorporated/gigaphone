@@ -75,3 +75,21 @@ def test_discovery_finds_direct_agent_sdk_call(tmp_path):
     assert agent.match_call == "harness.run_subagent"
     assert agent.emit_name == "harness.subagent.openai-agents"
     assert agent.output_paths == ["final_output"]
+
+
+def test_discovery_finds_construct_then_carrier_shape(tmp_path):
+    # mimics OpenHands: build an Agent config, then httpx.post it to the agent-server
+    (tmp_path / "service.py").write_text(
+        "from __future__ import annotations\n"
+        "from openhands.sdk import Agent\n"
+        "import httpx\n\n"
+        "def start_conversation(task, client):\n"
+        "    agent = Agent(model='gpt-5')\n"
+        "    resp = client.post('http://agent-server/api/conversations', json={'agent': agent})\n"
+        "    return resp.json()\n"
+    )
+    descs = _discover.discover(str(tmp_path))
+    agent = next((d for d in descs if d.kind.value == "agent_call"), None)
+    assert agent is not None
+    assert agent.match_call == "service.start_conversation"
+    assert agent.emit_name == "service.subagent.openhands-sdk"
