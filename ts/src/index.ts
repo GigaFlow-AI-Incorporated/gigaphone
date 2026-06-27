@@ -19,6 +19,14 @@ export * as engine from "./engine/index.js";
 // Registries
 export { allPacks, packForPath, packById } from "./packs/registry.js";
 export { backendById, selectBackend } from "./adapters/backend/registry.js";
+export {
+  adapterById as codebaseAdapterById,
+  bundledAdapters as bundledCodebaseAdapters,
+  detectAdapters as detectCodebaseAdapters,
+  loadRepoAdapter as loadRepoCodebaseAdapter,
+  SCAFFOLD_FILENAME,
+  scaffoldSource as scaffoldCodebaseAdapter,
+} from "./adapters/codebase/index.js";
 
 // Config I/O
 export * as config from "./config/config.js";

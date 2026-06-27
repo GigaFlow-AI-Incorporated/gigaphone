@@ -6,9 +6,12 @@
  * the source of truth between invocations (ADR-0004); commands re-derive from config + code.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { selectBackend } from "./adapters/backend/registry.js";
+import { bundledAdapters } from "./adapters/codebase/registry.js";
+import { SCAFFOLD_FILENAME, scaffoldSource } from "./adapters/codebase/scaffold.js";
+import type { CodebaseAdapter } from "./interfaces/codebaseAdapter.js";
 import * as config from "./config/config.js";
 import type { Boundary } from "./core/model.js";
 import { detect } from "./engine/detect.js";
@@ -35,7 +38,13 @@ const COMMANDS: Array<[string, string]> = [
   ["fix", "apply codemods via the backend adapter + language pack; emit diffs"],
   ["verify", "backend-adapter verify against the live project"],
   ["onboard", "run discover → fix → verify and print the onboarding report"],
+  ["codebase", "scaffold/list codebase adapters (codebase init <name> | codebase list)"],
 ];
+
+/** Bundled codebase adapters whose detect() claims this repo (sync; OSS adapters auto-activate). */
+function activeCodebaseAdapters(repo: string): CodebaseAdapter[] {
+  return bundledAdapters().filter((a) => a.detect(repo));
+}
 
 interface Args {
   command: string | null;
@@ -140,6 +149,7 @@ export function main(argv: string[]): number {
     fix: cmdFix,
     verify: cmdVerify,
     onboard: cmdOnboard,
+    codebase: cmdCodebase,
   };
   const handler = handlers[args.command];
   if (!handler) {
@@ -156,8 +166,46 @@ export function main(argv: string[]): number {
   }
 }
 
+function cmdCodebase(args: Args): number {
+  const sub = args.positional[0];
+  if (sub === "init") {
+    const name = args.positional[1];
+    if (!name) {
+      process.stderr.write("usage: gigaphone codebase init <name>\n");
+      return 2;
+    }
+    const dest = join(args.repo, SCAFFOLD_FILENAME);
+    if (existsSync(dest)) {
+      process.stderr.write(`refusing to overwrite existing ${SCAFFOLD_FILENAME}\n`);
+      return 1;
+    }
+    writeFileSync(dest, scaffoldSource(name), "utf-8");
+    process.stdout.write(
+      `Wrote ${SCAFFOLD_FILENAME} — fill in detect()/discover() with knowledge of '${name}'.\n`,
+    );
+    return 0;
+  }
+  if (sub === "list") {
+    const active = new Set(activeCodebaseAdapters(args.repo).map((a) => a.id));
+    process.stdout.write("bundled codebase adapters:\n");
+    for (const a of bundledAdapters()) {
+      process.stdout.write(`  ${a.id}${active.has(a.id) ? "  (detected in this repo)" : ""}\n`);
+    }
+    process.stdout.write(
+      `proprietary: add a default-exported adapter at ${SCAFFOLD_FILENAME} (gigaphone codebase init <name>).\n`,
+    );
+    return 0;
+  }
+  process.stderr.write("usage: gigaphone codebase <init|list> ...\n");
+  return 2;
+}
+
 function cmdDiscover(args: Args): number {
-  const descriptors = discover(args.repo, args.scope ?? undefined);
+  const descriptors = discover(
+    args.repo,
+    args.scope ?? undefined,
+    activeCodebaseAdapters(args.repo),
+  );
   const path = config.save(args.repo, descriptors);
   process.stdout.write(`discovered ${descriptors.length} boundary descriptor(s) → ${path}\n`);
   for (const d of descriptors) {
@@ -286,9 +334,13 @@ function cmdVerify(args: Args): number {
   return tree.ok ? 0 : 1;
 }
 
+function cmdOnboardDiscover(args: Args) {
+  return discover(args.repo, args.scope ?? undefined, activeCodebaseAdapters(args.repo));
+}
+
 function cmdOnboard(args: Args): number {
   const backend = selectBackend(args.repo, args.backend ?? undefined);
-  const descriptors = discover(args.repo, args.scope ?? undefined);
+  const descriptors = cmdOnboardDiscover(args);
   config.save(args.repo, descriptors);
   const boundaries = detect(args.repo, descriptors, args.scope ?? undefined);
   const plan = buildPlan(descriptors, boundaries);

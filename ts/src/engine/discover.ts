@@ -7,12 +7,32 @@
  */
 
 import type { Descriptor } from "../core/model.js";
+import type { CodebaseAdapter } from "../interfaces/codebaseAdapter.js";
 import { packForPath } from "../packs/registry.js";
 import { read, scan } from "./project.js";
 
-export function discover(root: string, scope?: string): Descriptor[] {
+/**
+ * Phase A discovery. Unions each language pack's heuristic `discover` with any active
+ * `CodebaseAdapter`s' bespoke recognition (DESIGN §8; ADR-0010). Codebase adapters win ties
+ * (they encode authored knowledge of the codebase), so they are unioned first. Passing no
+ * adapters preserves the original generic-discovery behavior exactly.
+ */
+export function discover(
+  root: string,
+  scope?: string,
+  codebaseAdapters: CodebaseAdapter[] = [],
+): Descriptor[] {
   const found = new Map<string, Descriptor>();
-  for (const sf of scan(root, scope)) {
+  const files = scan(root, scope);
+  // codebase adapters first — authored knowledge takes precedence over generic heuristics
+  for (const adapter of codebaseAdapters) {
+    for (const sf of files) {
+      for (const d of adapter.discover(sf.relPath, read(sf))) {
+        if (!found.has(d.matchCall)) found.set(d.matchCall, d);
+      }
+    }
+  }
+  for (const sf of files) {
     const pack = packForPath(sf.absPath);
     if (pack === null) continue;
     for (const d of pack.discover(sf.relPath, read(sf))) {
