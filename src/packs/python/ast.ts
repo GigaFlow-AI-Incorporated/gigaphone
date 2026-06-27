@@ -252,7 +252,8 @@ function unparseJoinedStr(node: Node): string {
   let out = "f'";
   for (const part of node.values as Node[]) {
     if (part.type === "Constant" && typeof part.value === "string") {
-      out += part.value.replace(/'/g, "\\'");
+      // escape backslashes before quotes (incomplete-sanitization otherwise)
+      out += part.value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
     } else if (part.type === "FormattedValue") {
       out += `{${unparse(part.value)}}`;
     } else {
