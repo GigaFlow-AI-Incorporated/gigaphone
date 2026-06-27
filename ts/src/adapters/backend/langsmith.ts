@@ -10,24 +10,24 @@
 import { OtelAdapter, scanForAny } from "./otel/adapter.js";
 
 export class LangSmithAdapter extends OtelAdapter {
-  readonly id = "langsmith";
+  override readonly id = "langsmith";
   // Identical placement + call sites as the OTel family; only the imported shim (per
   // language) and the backend id differ. The whole primitiveFor / verify surface is
   // inherited from OtelAdapter, which reads this.shimPackages + this.id.
-  shimPackages: Record<string, string> = {
+  override shimPackages: Record<string, string> = {
     python: "gigaphone.runtime.langsmith",
     typescript: "@gigaphone/langsmith",
   };
 
-  detectPresence(repo: string): boolean {
+  override detectPresence(repo: string): boolean {
     return scanForAny(repo, [".py"], (t) => t.includes("langsmith"));
   }
 
-  configSchema(): Record<string, string> {
+  override configSchema(): Record<string, string> {
     return { project: "LANGCHAIN_PROJECT", api_key: "LANGCHAIN_API_KEY" };
   }
 
-  initSnippet(_config: Record<string, string>): string {
+  override initSnippet(_config: Record<string, string>): string {
     return (
       "import langsmith  # tracing is enabled via LANGCHAIN_TRACING_V2=true\n" +
       "_ls_client = langsmith.Client()\n"

@@ -17,20 +17,20 @@ function pyRepr(s: string): string {
 }
 
 export class PhoenixAdapter extends OtelAdapter {
-  readonly id = "phoenix";
+  override readonly id = "phoenix";
   // Identical placement + call sites as the OTel family; only the imported shim (per
   // language) and the backend id differ. The whole primitiveFor / verify surface is
   // inherited from OtelAdapter, which reads this.shimPackages + this.id.
-  shimPackages: Record<string, string> = {
+  override shimPackages: Record<string, string> = {
     python: "gigaphone.runtime.phoenix",
     typescript: "@gigaphone/phoenix",
   };
 
-  detectPresence(repo: string): boolean {
+  override detectPresence(repo: string): boolean {
     return scanForAny(repo, [".py"], (t) => t.includes("phoenix") || t.includes("arize"));
   }
 
-  configSchema(): Record<string, string> {
+  override configSchema(): Record<string, string> {
     return {
       endpoint: "Phoenix/Arize collector endpoint (OTLP)",
       project: "PHOENIX_PROJECT_NAME (or Arize space/project)",
@@ -38,7 +38,7 @@ export class PhoenixAdapter extends OtelAdapter {
     };
   }
 
-  initSnippet(config: Record<string, string>): string {
+  override initSnippet(config: Record<string, string>): string {
     const project = config.project ?? "${PHOENIX_PROJECT_NAME}";
     return (
       "from phoenix.otel import register\n" +
