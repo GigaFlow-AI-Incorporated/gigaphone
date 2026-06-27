@@ -9,7 +9,7 @@
  * boundary. This emits the neutral `agent_call` Descriptor; the pipeline does the rest.
  */
 
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { BoundaryKind } from "../../../core/boundary.js";
 import { Descriptor } from "../../../core/model.js";

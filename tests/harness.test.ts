@@ -56,10 +56,8 @@ it("plugin ships no mcp server and uses auto-loaded conventions", () => {
   expect(".mcp.json" in cc).toBe(false);
   expect("mcp_servers" in renderCodex()["plugin.toml"]).toBe(false);
   expect("mcp_server" in PLUGIN).toBe(false);
-  // the post-edit hook launches a bare python3 against the cloned source
-  expect(PLUGIN.hook_command.startsWith('PYTHONPATH="${CLAUDE_PLUGIN_ROOT}/src" python3 -m')).toBe(
-    true,
-  );
+  // the post-edit hook launches the built Node CLI from the plugin dir
+  expect(PLUGIN.hook_command.startsWith('node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js"')).toBe(true);
 });
 
 it("codex runs command-only hooks", () => {

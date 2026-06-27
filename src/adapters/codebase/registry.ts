@@ -11,7 +11,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { CodebaseAdapter } from "../../interfaces/codebaseAdapter.js";
+import type { CodebaseAdapter } from "../../interfaces/codebaseAdapter.js";
 import { OpenHandsAdapter } from "./examples/openhands.js";
 
 const BUNDLED: CodebaseAdapter[] = [new OpenHandsAdapter()];

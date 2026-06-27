@@ -10,7 +10,7 @@ function className(name: string): string {
   const camel = name.replace(/[^a-zA-Z0-9]+(.)?/g, (_, c: string | undefined) =>
     c ? c.toUpperCase() : "",
   );
-  const base = (camel.charAt(0).toUpperCase() + camel.slice(1)) || "Custom";
+  const base = camel.charAt(0).toUpperCase() + camel.slice(1) || "Custom";
   return `${base}Adapter`;
 }
 

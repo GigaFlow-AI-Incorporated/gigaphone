@@ -6,10 +6,10 @@
  * single `PLUGIN` spec and render it per harness.
  *
  * The repo root is itself the Claude Code plugin **and** a single-plugin marketplace. The
- * engine invokes a bare `python3` against the cloned source (no pip/uv/venv) for the runtime
- * hook the plugin ships. The skill drives the engine via that CLI on demand — the plugin
- * ships **no MCP server** (a stdio MCP process was tried and removed: it added a flaky
- * always-on connection for no benefit over invoking the CLI directly).
+ * post-edit hook the plugin ships runs the built Node CLI (`node dist/cli.js`). The skill
+ * drives the engine via that CLI on demand — the plugin ships **no MCP server** (a stdio MCP
+ * process was tried and removed: it added a flaky always-on connection for no benefit over
+ * invoking the CLI directly).
  */
 
 import { readFileSync } from "node:fs";
@@ -43,14 +43,12 @@ export const DESCRIPTION =
   "Trace-coverage instrumentation for AI agent tool executions — " +
   "neutral across harness, language, vendor, and codebase.";
 
-// The engine is pure stdlib (zero third-party deps), so the hook runs a bare `python3`
-// (3.9+, e.g. Apple's system interpreter) against the cloned source — no pip/uv/venv.
-// ${CLAUDE_PLUGIN_ROOT} is the plugin dir (= repo root); ${CLAUDE_PROJECT_DIR} is the
-// user's project where the hook runs.
-const _PYTHONPATH = "${CLAUDE_PLUGIN_ROOT}/src";
+// The engine is the built Node CLI, so the post-edit hook runs `node` against the plugin's
+// compiled entrypoint. ${CLAUDE_PLUGIN_ROOT} is the plugin dir (= repo root, shipping dist/);
+// ${CLAUDE_PROJECT_DIR} is the user's project where the hook runs. `|| true` keeps a failed
+// detect from blocking the edit.
 const _HOOK_COMMAND =
-  `PYTHONPATH="${_PYTHONPATH}" python3 -m gigaphone.cli detect ` +
-  '--repo "${CLAUDE_PROJECT_DIR}" || true';
+  'node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" detect ' + '--repo "${CLAUDE_PROJECT_DIR}" || true';
 
 export interface Plugin {
   name: string;

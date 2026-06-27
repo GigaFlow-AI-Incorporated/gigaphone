@@ -11,7 +11,6 @@ import { join, relative } from "node:path";
 import { selectBackend } from "./adapters/backend/registry.js";
 import { bundledAdapters } from "./adapters/codebase/registry.js";
 import { SCAFFOLD_FILENAME, scaffoldSource } from "./adapters/codebase/scaffold.js";
-import type { CodebaseAdapter } from "./interfaces/codebaseAdapter.js";
 import * as config from "./config/config.js";
 import type { Boundary } from "./core/model.js";
 import { detect } from "./engine/detect.js";
@@ -23,6 +22,7 @@ import { ingestResolution } from "./engine/resolve.js";
 import { applyReview } from "./engine/review.js";
 import * as verifyEngine from "./engine/verify.js";
 import type { VerifyBackend } from "./engine/verify.js";
+import type { CodebaseAdapter } from "./interfaces/codebaseAdapter.js";
 import { packForPath } from "./packs/registry.js";
 
 const COMMANDS: Array<[string, string]> = [

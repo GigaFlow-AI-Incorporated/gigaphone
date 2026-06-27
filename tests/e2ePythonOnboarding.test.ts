@@ -31,7 +31,10 @@ const TESTCLIENT = join(REPO, "testclient", "app");
 function pythonWithOtel(): string | null {
   const candidates = [join(REPO, ".venv", "bin", "python"), "python3"];
   for (const py of candidates) {
-    const p = spawnSync(py, ["-c", "import opentelemetry.sdk"], { encoding: "utf-8", timeout: 20_000 });
+    const p = spawnSync(py, ["-c", "import opentelemetry.sdk"], {
+      encoding: "utf-8",
+      timeout: 20_000,
+    });
     if (p.status === 0) return py;
   }
   return null;
@@ -103,7 +106,10 @@ describe("e2e: Python onboarding (testclient)", () => {
     expect(Object.keys(result.diffs).length).toBeGreaterThan(0);
 
     const after = verify(root, expectations, be);
-    expect(after.every((v) => v.ok), JSON.stringify(after.map((v) => [v.tool, v.detail]))).toBe(true);
+    expect(
+      after.every((v) => v.ok),
+      JSON.stringify(after.map((v) => [v.tool, v.detail])),
+    ).toBe(true);
 
     const boundaries2 = detect(root, descs, "app");
     expect(

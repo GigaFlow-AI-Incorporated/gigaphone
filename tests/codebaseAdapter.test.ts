@@ -9,10 +9,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  detectAdapters,
-  loadRepoAdapter,
   OpenHandsAdapter,
   SCAFFOLD_FILENAME,
+  detectAdapters,
+  loadRepoAdapter,
   scaffoldSource,
 } from "../src/adapters/codebase/index.js";
 import { BoundaryKind } from "../src/core/boundary.js";
