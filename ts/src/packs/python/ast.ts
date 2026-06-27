@@ -97,7 +97,7 @@ export function* walk(node: Node): Generator<Node> {
   const todo: Node[] = [node];
   let i = 0;
   while (i < todo.length) {
-    const current = todo[i++];
+    const current = todo[i++]!; // i < todo.length guarantees presence
     for (const child of iterChildNodes(current)) todo.push(child);
     yield current;
   }
@@ -229,7 +229,7 @@ export function unparse(node: Node | null | undefined): string {
       const ops = node.ops as Node[];
       const comparators = node.comparators as Node[];
       for (let i = 0; i < ops.length; i++) {
-        out += ` ${CMPOP[ops[i].type] ?? "?"} ${unparse(comparators[i])}`;
+        out += ` ${CMPOP[ops[i]!.type] ?? "?"} ${unparse(comparators[i])}`;
       }
       return out;
     }

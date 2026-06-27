@@ -84,7 +84,7 @@ function is_truncation(node: Node | null | undefined): boolean {
 function truncation_base(node: Node): string | null {
   if (!is_truncation(node)) return null;
   let base: Node = node.value;
-  if (base.type === "Call" && (base.args as Node[]).length) base = (base.args as Node[])[0];
+  if (base.type === "Call" && (base.args as Node[]).length) base = (base.args as Node[])[0]!;
   return attrChain(base) || null;
 }
 
@@ -180,6 +180,7 @@ export class PythonPack extends LanguagePack {
       for (let i = 0; i < keys.length; i++) {
         const k = keys[i];
         const v = values[i];
+        if (k === undefined || v === undefined) continue; // zip stops at the shorter
         const fn = attrChain(v);
         if (!fn || fn.includes(".")) continue;
         const target = imports[fn] ?? `${module}.${fn}`;
@@ -348,7 +349,7 @@ export class PythonPack extends LanguagePack {
     b.requiresCompleteAttrs = true;
     b.decoratorInsertByte = smap.lineStartOffset(
       (fn.decorator_list as Node[]).length
-        ? ((fn.decorator_list as Node[])[0].lineno as number)
+        ? ((fn.decorator_list as Node[])[0]!.lineno as number)
         : (fn.lineno as number),
     );
     b.insertIndent = " ".repeat(fn.col_offset as number);
@@ -375,7 +376,7 @@ export class PythonPack extends LanguagePack {
         b.spanBlockInsertByte = smap.lineStartOffset(ret.lineno as number);
         b.insertIndent = " ".repeat(ret.col_offset as number);
       } else {
-        const last = (spanWith.body as Node[])[(spanWith.body as Node[]).length - 1];
+        const last = (spanWith.body as Node[])[(spanWith.body as Node[]).length - 1]!; // with-body non-empty
         b.spanBlockInsertByte = smap.lineStartOffset((last.end_lineno as number) + 1);
         b.insertIndent = " ".repeat(last.col_offset as number);
       }
@@ -389,7 +390,7 @@ export class PythonPack extends LanguagePack {
     b.llmModelAttr = llm_model_attr(fn);
     b.decoratorInsertByte = smap.lineStartOffset(
       (fn.decorator_list as Node[]).length
-        ? ((fn.decorator_list as Node[])[0].lineno as number)
+        ? ((fn.decorator_list as Node[])[0]!.lineno as number)
         : (fn.lineno as number),
     );
     b.insertIndent = " ".repeat(fn.col_offset as number);
@@ -502,11 +503,12 @@ function basename(seg: string): string {
 
 function module_name(path: string): string {
   let parts = path.replace(/\\/g, "/").split("/");
-  parts[parts.length - 1] = parts[parts.length - 1].endsWith(".py")
-    ? parts[parts.length - 1].slice(0, -3)
-    : parts[parts.length - 1];
+  const lastIdx = parts.length - 1;
+  parts[lastIdx] = parts[lastIdx]!.endsWith(".py")
+    ? parts[lastIdx]!.slice(0, -3)
+    : parts[lastIdx]!;
   // drop leading dirs up to and including a source root (empty segments from a leading "/").
-  while (parts.length && !basename(parts[0])) parts.shift();
+  while (parts.length && !basename(parts[0]!)) parts.shift();
   // heuristic: start the module at the first "app"-like package segment if present.
   for (let i = 0; i < parts.length; i++) {
     if (parts[i] === "app" || parts[i] === "src") {
@@ -560,7 +562,7 @@ function decorator_span_name(fn: Node): string | null {
         if (kw.arg === "name" && kw.value.type === "Constant") return kw.value.value;
       }
       const args = dec.args as Node[];
-      if (args.length && args[0].type === "Constant") return args[0].value;
+      if (args.length && args[0]!.type === "Constant") return args[0]!.value;
     }
   }
   return null;
@@ -592,7 +594,7 @@ function origin(
 }
 
 function root_pkg(o: string | null): string | null {
-  return o ? o.split(".")[0] : null;
+  return o ? o.split(".")[0]! : null;
 }
 
 function local_binds(fn: Node, imports: Record<string, string>): Record<string, string> {
@@ -729,7 +731,7 @@ function llm_model_expr(spanWith: Node): string | null {
       n.func.attr === "set_attribute" &&
       (n.args as Node[]).length >= 2
     ) {
-      const key = (n.args as Node[])[0];
+      const key = (n.args as Node[])[0]!; // args.length >= 2 checked above
       if (key.type === "Constant" && typeof key.value === "string" && key.value.toLowerCase().includes("model")) {
         return unparse((n.args as Node[])[1]);
       }
@@ -771,7 +773,7 @@ function find_span_with(fn: Node): Node | null {
 function span_name(spanWith: Node): string | null {
   for (const item of spanWith.items as Node[]) {
     if (item.context_expr.type === "Call" && (item.context_expr.args as Node[]).length) {
-      const arg = (item.context_expr.args as Node[])[0];
+      const arg = (item.context_expr.args as Node[])[0]!; // args.length checked above
       if (arg.type === "Constant" && typeof arg.value === "string") return arg.value;
     }
   }
@@ -831,7 +833,7 @@ function find_lossy_attr(spanWith: Node): [string, string, number, string] | nul
   }
   if (spanVar === null) return null;
   const body = spanWith.body as Node[];
-  const lastStmt = body[body.length - 1];
+  const lastStmt = body[body.length - 1]!; // with-body non-empty
   const indent = " ".repeat(lastStmt.col_offset as number);
   for (const n of walk(spanWith)) {
     if (
@@ -840,7 +842,7 @@ function find_lossy_attr(spanWith: Node): [string, string, number, string] | nul
       n.func.attr === "set_attribute" &&
       (n.args as Node[]).length >= 2
     ) {
-      const base = truncation_base((n.args as Node[])[1]);
+      const base = truncation_base((n.args as Node[])[1]!); // args.length >= 2 checked above
       if (base) return [spanVar, base, (lastStmt.end_lineno as number) + 1, indent];
     }
   }
@@ -878,10 +880,10 @@ function import_insert_offset(source: string, smap: SourceMap): number {
   const body = (tree?.body as Node[]) ?? [];
   if (
     body.length &&
-    body[0].type === "Expr" &&
-    body[0].value.type === "Constant"
+    body[0]!.type === "Expr" &&
+    body[0]!.value.type === "Constant"
   ) {
-    afterLine = (body[0].end_lineno as number) + 1;
+    afterLine = (body[0]!.end_lineno as number) + 1;
   }
   for (const n of body) {
     if (n.type === "ImportFrom" && n.module === "__future__") afterLine = (n.end_lineno as number) + 1;
@@ -976,17 +978,17 @@ export function native_otel_body_wrap(
   let bodyStmts = fn.body as Node[];
   if (
     bodyStmts.length &&
-    bodyStmts[0].type === "Expr" &&
-    bodyStmts[0].value.type === "Constant" &&
-    typeof bodyStmts[0].value.value === "string"
+    bodyStmts[0]!.type === "Expr" &&
+    bodyStmts[0]!.value.type === "Constant" &&
+    typeof bodyStmts[0]!.value.value === "string"
   ) {
     bodyStmts = bodyStmts.slice(1);
   }
   if (!bodyStmts.length) return null;
 
-  const baseIndent = " ".repeat(bodyStmts[0].col_offset as number);
+  const baseIndent = " ".repeat(bodyStmts[0]!.col_offset as number); // bodyStmts non-empty (checked above)
 
-  const bodyStartByte = smap.lineStartOffset(bodyStmts[0].lineno as number);
+  const bodyStartByte = smap.lineStartOffset(bodyStmts[0]!.lineno as number);
   const bodyEndByte = smap.lineStartOffset((fn.end_lineno as number) + 1);
 
   const originalBodyText = sliceBytes(source, bodyStartByte, bodyEndByte);
